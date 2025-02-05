@@ -31,6 +31,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
   );
 
+  GoogleSignInAccount? _currentUser;
   CalendarApi? _calendarApi;
   List<Appointment> _events = [];
   bool _isLoading = false;
@@ -39,18 +40,49 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeGoogleSignIn();
+    _googleSignIn.onCurrentUserChanged.listen((GoogleSignInAccount? account) {
+      setState(() {
+        _currentUser = account;
+      });
+      if (account != null) {
+        _initializeGoogleSignIn();
+      }
+    });
+    _googleSignIn.signInSilently().then((account) {
+      if (account == null) {
+        _handleSignIn();
+      }
+    });
+  }
+
+  Future<void> _handleSignIn() async {
+    try {
+      final GoogleSignInAccount? account = await _googleSignIn.signIn();
+      setState(() {
+        _currentUser = account;
+      });
+      if (account != null) {
+        _initializeGoogleSignIn();
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Sign-in failed: ${e.toString()}';
+      });
+    }
   }
 
   Future<void> _initializeGoogleSignIn() async {
     try {
       setState(() => _isLoading = true);
-      final GoogleSignInAccount? account = await _googleSignIn.signIn();
+      final GoogleSignInAccount? account = _currentUser;
       if (account != null) {
         final authHeaders = await account.authHeaders;
         final client = GoogleAuthClient(authHeaders);
-        _calendarApi = CalendarApi(client);
+        setState(() {
+          _calendarApi = CalendarApi(client);
+        });
         await _fetchEvents();
+        _showLoginMessage();
       }
     } catch (e) {
       setState(() {
@@ -61,6 +93,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _fetchEvents() async {
+    if (_calendarApi == null) {
+      setState(() {
+        _errorMessage = 'Calendar API is not initialized.';
+        _isLoading = false;
+      });
+      return;
+    }
+
     try {
       final Events events = await _calendarApi!.events.list(
         'primary',
@@ -82,8 +122,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   List<Appointment> _convertGoogleEvents(List<Event> events) {
     return events.map((event) {
-      final start = _parseEventDateTime(event.start!);
-      final end = _parseEventDateTime(event.end!);
+      final start = _parseEventDateTime(event.start);
+      final end = _parseEventDateTime(event.end);
 
       return Appointment(
         startTime: start,
@@ -95,11 +135,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }).toList();
   }
 
-  DateTime _parseEventDateTime(EventDateTime dateTime) {
+  DateTime _parseEventDateTime(EventDateTime? dateTime) {
+    if (dateTime == null) {
+      return DateTime.now();
+    }
     if (dateTime.dateTime != null) {
       return dateTime.dateTime!.toLocal();
     }
     return dateTime.date!.toLocal();
+  }
+
+  Future<void> _handleSignOut() async {
+    await _googleSignIn.signOut();
+    setState(() {
+      _currentUser = null;
+      _calendarApi = null;
+      _events = [];
+    });
+  }
+
+  void _showLoginMessage() {
+    final snackBar = SnackBar(
+      content: const Text('You have successfully logged in'),
+      duration: const Duration(seconds: 1),
+    );
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
   @override
@@ -108,6 +168,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
       appBar: AppBar(
         title: const Text('Google Calendar Events'),
         actions: [
+          if (_currentUser != null)
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: _handleSignOut,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.login),
+              onPressed: _handleSignIn,
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isLoading ? null : _fetchEvents,
@@ -126,7 +196,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       return Center(child: Text(_errorMessage!));
     }
     return SfCalendar(
-      view: CalendarView.week,
+      view: CalendarView.day,
       dataSource: _CalendarDataSource(_events),
     );
   }
