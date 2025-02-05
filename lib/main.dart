@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/calendar/v3.dart' hide Colors;
 import 'package:http/http.dart' as http;
 import 'package:syncfusion_flutter_calendar/calendar.dart';
+import 'package:intl/intl.dart'; // Add this import for date formatting
 
 void main() => runApp(const MyApp());
 
@@ -36,6 +37,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   List<Appointment> _events = [];
   bool _isLoading = false;
   String? _errorMessage;
+  DateTime _selectedDate = DateTime.now(); // Add this to keep track of the selected date
 
   @override
   void initState() {
@@ -112,6 +114,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
         _events = _convertGoogleEvents(events.items ?? []);
         _isLoading = false;
       });
+
+      // Debugging information
+      print('Fetched ${events.items?.length ?? 0} events');
+      for (var event in events.items ?? []) {
+        print('Event: ${event.summary}, Start: ${event.start?.dateTime ?? event.start?.date}, End: ${event.end?.dateTime ?? event.end?.date}');
+      }
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to load events: ${e.toString()}';
@@ -164,6 +172,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final String formattedDate = DateFormat('MMMM dd, yyyy').format(_selectedDate); // Format the selected date
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Google Calendar Events'),
@@ -184,7 +194,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
         ],
       ),
-      body: _buildMainContent(),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              formattedDate,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(child: _buildMainContent()),
+        ],
+      ),
     );
   }
 
@@ -198,6 +219,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return SfCalendar(
       view: CalendarView.day,
       dataSource: _CalendarDataSource(_events),
+      onViewChanged: (ViewChangedDetails details) {
+        setState(() {
+          _selectedDate = details.visibleDates.first;
+        });
+      },
     );
   }
 }
