@@ -4,6 +4,7 @@ import 'package:googleapis/calendar/v3.dart' hide Colors;
 import 'package:http/http.dart' as http;
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 void main() => runApp(const MyApp());
 
@@ -218,7 +219,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
               const PopupMenuItem(
                 value: 'Refresh',
-                child: Text('Refresh Events'),
+                child: Text('Refresh'),
               ),
             ],
             icon: const Icon(Icons.more_vert),
@@ -242,7 +243,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Widget _buildMainContent() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: Container(
+          color: Colors.blue,
+          child: SpinKitFadingFour(
+            color: Colors.white,
+            size: 100.0,
+          ),
+        ),
+      );
     }
     if (_errorMessage != null) {
       return Center(child: Text(_errorMessage!));
