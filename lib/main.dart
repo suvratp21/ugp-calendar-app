@@ -191,19 +191,37 @@ class _CalendarScreenState extends State<CalendarScreen> {
       appBar: AppBar(
         title: const Text('Calendar'),
         actions: [
-          if (_currentUser != null)
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: _handleSignOut,
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.login),
-              onPressed: _handleSignIn,
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _fetchEventsForSelectedDate,
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'Sign In':
+                  _handleSignIn();
+                  break;
+                case 'Sign Out':
+                  _handleSignOut();
+                  break;
+                case 'Refresh':
+                  if (!_isLoading) _fetchEventsForSelectedDate();
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              if (_currentUser == null)
+                const PopupMenuItem(
+                  value: 'Sign In',
+                  child: Text('Sign In'),
+                )
+              else
+                const PopupMenuItem(
+                  value: 'Sign Out',
+                  child: Text('Sign Out'),
+                ),
+              const PopupMenuItem(
+                value: 'Refresh',
+                child: Text('Refresh Events'),
+              ),
+            ],
+            icon: const Icon(Icons.more_vert),
           ),
         ],
       ),
