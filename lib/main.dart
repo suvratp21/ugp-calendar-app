@@ -3,7 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/calendar/v3.dart' hide Colors;
 import 'package:http/http.dart' as http;
 import 'package:syncfusion_flutter_calendar/calendar.dart';
-import 'package:intl/intl.dart'; // Add this import for date formatting
+import 'package:intl/intl.dart';
 
 void main() => runApp(const MyApp());
 
@@ -13,7 +13,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Google Calendar Android',
+      title: 'Calendar App',
       theme: ThemeData(primarySwatch: Colors.blue),
       home: const CalendarScreen(),
     );
@@ -37,7 +37,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   List<Appointment> _events = [];
   bool _isLoading = false;
   String? _errorMessage;
-  DateTime _selectedDate = DateTime.now(); // Add this to keep track of the selected date
+  DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
@@ -115,10 +115,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
         _isLoading = false;
       });
 
-      // Debugging information
       print('Fetched ${events.items?.length ?? 0} events');
       for (var event in events.items ?? []) {
-        print('Event: ${event.summary}, Start: ${event.start?.dateTime ?? event.start?.date}, End: ${event.end?.dateTime ?? event.end?.date}');
+        print(
+            'Event: ${event.summary}, Start: ${event.start?.dateTime ?? event.start?.date}, End: ${event.end?.dateTime ?? event.end?.date}');
       }
     } catch (e) {
       setState(() {
@@ -172,25 +172,43 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final String formattedDate = DateFormat('MMMM dd, yyyy').format(_selectedDate); // Format the selected date
+    final String formattedDate =
+        DateFormat('MMMM dd, yyyy').format(_selectedDate);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Google Calendar Events'),
+        title: const Text('Calendar'),
         actions: [
-          if (_currentUser != null)
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: _handleSignOut,
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.login),
-              onPressed: _handleSignIn,
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _fetchEvents,
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'Sign In':
+                  _handleSignIn();
+                  break;
+                case 'Sign Out':
+                  _handleSignOut();
+                  break;
+                case 'Refresh':
+                  _isLoading ? null : _fetchEvents();
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              if (_currentUser == null)
+                const PopupMenuItem(
+                  value: 'Sign In',
+                  child: Text('Sign In'),
+                )
+              else
+                const PopupMenuItem(
+                  value: 'Sign Out',
+                  child: Text('Sign Out'),
+                ),
+              const PopupMenuItem(
+                value: 'Refresh',
+                child: Text('Refresh'),
+              ),
+            ],
           ),
         ],
       ),
@@ -219,10 +237,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return SfCalendar(
       view: CalendarView.day,
       dataSource: _CalendarDataSource(_events),
+      key: ValueKey(_selectedDate),
+      initialDisplayDate: _selectedDate,
+      headerStyle: const CalendarHeaderStyle(
+        textAlign: TextAlign.center,
+      ),
       onViewChanged: (ViewChangedDetails details) {
-        setState(() {
-          _selectedDate = details.visibleDates.first;
-        });
+        if (_selectedDate != details.visibleDates.first) {
+          setState(() {
+            _selectedDate = details.visibleDates.first;
+          });
+        }
       },
     );
   }
