@@ -83,7 +83,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         setState(() {
           _calendarApi = CalendarApi(client);
         });
-        await _fetchEvents();
+        await _fetchEventsForSelectedDate();
         _showLoginMessage();
       }
     } catch (e) {
@@ -94,7 +94,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  Future<void> _fetchEvents() async {
+  Future<void> _fetchEventsForSelectedDate() async {
     if (_calendarApi == null) {
       setState(() {
         _errorMessage = 'Calendar API is not initialized.';
@@ -104,10 +104,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
 
     try {
+      final DateTime startOfDay =
+          DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+      final DateTime endOfDay = startOfDay
+          .add(const Duration(days: 1))
+          .subtract(const Duration(seconds: 1));
+
       final Events events = await _calendarApi!.events.list(
         'primary',
-        timeMin: DateTime.now().toUtc(),
-        timeMax: DateTime.now().add(const Duration(days: 30)).toUtc(),
+        timeMin: startOfDay.toUtc(),
+        timeMax: endOfDay.toUtc(),
+        singleEvents: true,
+        orderBy: 'startTime',
       );
 
       setState(() {
@@ -115,7 +123,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         _isLoading = false;
       });
 
-      print('Fetched ${events.items?.length ?? 0} events');
+      print('Fetched ${events.items?.length ?? 0} events for $_selectedDate');
       for (var event in events.items ?? []) {
         print(
             'Event: ${event.summary}, Start: ${event.start?.dateTime ?? event.start?.date}, End: ${event.end?.dateTime ?? event.end?.date}');
@@ -129,18 +137,22 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   List<Appointment> _convertGoogleEvents(List<Event> events) {
-    return events.map((event) {
+    List<Appointment> appointments = [];
+    for (var event in events) {
       final start = _parseEventDateTime(event.start);
       final end = _parseEventDateTime(event.end);
 
-      return Appointment(
-        startTime: start,
-        endTime: end,
-        subject: event.summary ?? 'Untitled Event',
-        color: Colors.blue,
-        isAllDay: event.start?.date != null,
+      appointments.add(
+        Appointment(
+          startTime: start,
+          endTime: end,
+          subject: event.summary ?? 'Untitled Event',
+          color: Colors.blue,
+          isAllDay: event.start?.date != null,
+        ),
       );
-    }).toList();
+    }
+    return appointments;
   }
 
   DateTime _parseEventDateTime(EventDateTime? dateTime) {
@@ -179,36 +191,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
       appBar: AppBar(
         title: const Text('Calendar'),
         actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              switch (value) {
-                case 'Sign In':
-                  _handleSignIn();
-                  break;
-                case 'Sign Out':
-                  _handleSignOut();
-                  break;
-                case 'Refresh':
-                  _isLoading ? null : _fetchEvents();
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              if (_currentUser == null)
-                const PopupMenuItem(
-                  value: 'Sign In',
-                  child: Text('Sign In'),
-                )
-              else
-                const PopupMenuItem(
-                  value: 'Sign Out',
-                  child: Text('Sign Out'),
-                ),
-              const PopupMenuItem(
-                value: 'Refresh',
-                child: Text('Refresh'),
-              ),
-            ],
+          if (_currentUser != null)
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: _handleSignOut,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.login),
+              onPressed: _handleSignIn,
+            ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _isLoading ? null : _fetchEventsForSelectedDate,
           ),
         ],
       ),
@@ -246,7 +241,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
         if (_selectedDate != details.visibleDates.first) {
           setState(() {
             _selectedDate = details.visibleDates.first;
+            _isLoading = true;
           });
+          _fetchEventsForSelectedDate();
         }
       },
     );
