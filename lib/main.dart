@@ -5,8 +5,30 @@ import 'package:http/http.dart' as http;
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:awesome_notifications/awesome_notifications.dart'; // new import
 
-void main() => runApp(const MyApp());
+void main() {
+  // Initialize Awesome Notifications with a basic channel.
+  AwesomeNotifications().initialize(null, [
+    NotificationChannel(
+      channelKey: 'basic_channel',
+      channelName: 'Basic notifications',
+      channelDescription: 'Notification channel for event reminders',
+      defaultColor: Colors.teal,
+      ledColor: Colors.white,
+      importance: NotificationImportance.High,
+    )
+  ]);
+
+  // Request notification permission if not already allowed.
+  AwesomeNotifications().isNotificationAllowed().then((isAllowed) {
+    if (!isAllowed) {
+      AwesomeNotifications().requestPermissionToSendNotifications();
+    }
+  });
+
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -119,10 +141,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
         orderBy: 'startTime',
       );
 
+      final appointments = _convertGoogleEvents(events.items ?? []);
       setState(() {
-        _events = _convertGoogleEvents(events.items ?? []);
+        _events = appointments;
         _isLoading = false;
       });
+
+      // Schedule notifications for upcoming events.
+      final now = DateTime.now();
+      for (int i = 0; i < appointments.length; i++) {
+        final appointment = appointments[i];
+        if (appointment.startTime.isAfter(now)) {
+          _scheduleNotificationForEvent(appointment, i);
+        }
+      }
 
       print('Fetched ${events.items?.length ?? 0} events for $_selectedDate');
       for (var event in events.items ?? []) {
@@ -181,6 +213,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
       duration: const Duration(seconds: 1),
     );
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
+  }
+
+  // Helper method to create a scheduled notification for an event.
+  void _scheduleNotificationForEvent(Appointment appointment, int id) {
+    AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: id,
+          channelKey: 'basic_channel',
+          title: appointment.subject,
+          body: 'Your event "${appointment.subject}" is starting now!',
+          notificationLayout: NotificationLayout.Default,
+        ),
+        schedule: NotificationCalendar(
+          year: appointment.startTime.year,
+          month: appointment.startTime.month,
+          day: appointment.startTime.day,
+          hour: appointment.startTime.hour,
+          minute: appointment.startTime.minute,
+          second: appointment.startTime.second,
+          millisecond: 0,
+          repeats: false,
+        ));
   }
 
   @override

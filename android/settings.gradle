@@ -22,4 +22,6 @@ plugins {
     id "org.jetbrains.kotlin.android" version "1.8.22" apply false
 }
 
+// Removed apply from: "awesome_notifications_namespace.gradle" because subprojects() is not allowed here.
+
 include ":app"

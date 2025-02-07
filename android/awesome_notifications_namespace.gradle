@@ -1,0 +1,6 @@
+subprojects { project ->
+    if (project.name == "awesome_notifications" &&
+        project.extensions.findByName("android") != null) {
+        project.extensions.getByName("android").namespace = "io.awesome.notifications"
+    }
+}

@@ -1,3 +1,13 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.1'
+    }
+}
+
 allprojects {
     repositories {
         google()
@@ -11,6 +21,16 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+}
+
+// NEW: Patch to set namespace for awesome_notifications plugin.
+gradle.beforeProject { project ->
+    if (project.name == "awesome_notifications" &&
+        project.hasProperty("android") &&
+        project.android != null &&
+        !(project.android.hasProperty("namespace") && project.android.namespace != null)) {
+        project.android.namespace = "io.awesome.notifications"
+    }
 }
 
 tasks.register("clean", Delete) {
