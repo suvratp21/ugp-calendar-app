@@ -320,11 +320,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
       onViewChanged: (ViewChangedDetails details) {
         if (_selectedDate != details.visibleDates.first) {
-          setState(() {
-            _selectedDate = details.visibleDates.first;
-            _isLoading = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            setState(() {
+              _selectedDate = details.visibleDates.first;
+              _isLoading = true;
+            });
+            if (_calendarApi != null) {
+              _fetchEventsForSelectedDate();
+            } else {
+              setState(() {
+                _isLoading = false;
+              });
+            }
           });
-          _fetchEventsForSelectedDate();
         }
       },
     );

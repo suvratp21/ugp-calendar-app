@@ -1,0 +1,34 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        // ...existing code...
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.1'
+        // ...existing code...
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        // ...existing code...
+    }
+}
+
+rootProject.buildDir = "../build"
+// ...existing subprojects blocks...
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+// Removed the namespace patch block for awesome_notifications.
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
