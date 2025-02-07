@@ -6,6 +6,9 @@ import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:awesome_notifications/awesome_notifications.dart'; // new import
+import 'notification_settings.dart';
+import 'settings_page.dart';
+import 'event_edit_page.dart'; // new import
 
 void main() {
   // Initialize Awesome Notifications with a basic channel.
@@ -215,26 +218,66 @@ class _CalendarScreenState extends State<CalendarScreen> {
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
-  // Helper method to create a scheduled notification for an event.
+  // Updated helper method to schedule notification with remaining time.
   void _scheduleNotificationForEvent(Appointment appointment, int id) {
+    final offset =
+        Duration(minutes: NotificationSettings.defaultNotificationOffset);
+    var scheduledTime = appointment.startTime.subtract(offset);
+    // Ensure scheduledTime is in the future.
+    if (scheduledTime.isBefore(DateTime.now())) {
+      scheduledTime = DateTime.now().add(const Duration(seconds: 1));
+    }
+    // Compute remaining time until event start.
+    final durationRemaining = appointment.startTime.difference(DateTime.now());
+    final minutesRemaining = durationRemaining.inMinutes;
+    final secondsRemaining = durationRemaining.inSeconds % 60;
+    final remainingText = minutesRemaining > 0
+        ? '$minutesRemaining minutes'
+        : '$secondsRemaining seconds';
+
     AwesomeNotifications().createNotification(
         content: NotificationContent(
           id: id,
           channelKey: 'basic_channel',
           title: appointment.subject,
-          body: 'Your event "${appointment.subject}" is starting now!',
+          body:
+              'Your event "${appointment.subject}" is starting in $remainingText!',
           notificationLayout: NotificationLayout.Default,
         ),
         schedule: NotificationCalendar(
-          year: appointment.startTime.year,
-          month: appointment.startTime.month,
-          day: appointment.startTime.day,
-          hour: appointment.startTime.hour,
-          minute: appointment.startTime.minute,
-          second: appointment.startTime.second,
+          year: scheduledTime.year,
+          month: scheduledTime.month,
+          day: scheduledTime.day,
+          hour: scheduledTime.hour,
+          minute: scheduledTime.minute,
+          second: scheduledTime.second,
           millisecond: 0,
           repeats: false,
+          allowWhileIdle: true, // allows notification while app is closed
         ));
+  }
+
+  // New test notification method.
+  void _sendTestNotification() {
+    AwesomeNotifications().createNotification(
+        content: NotificationContent(
+      id: 999,
+      channelKey: 'basic_channel',
+      title: 'Test Notification',
+      body: 'This is a test notification sent by the button.',
+      notificationLayout: NotificationLayout.Default,
+    ));
+  }
+
+  Future<void> _openEventEditPage() async {
+    if (_calendarApi == null) return;
+    bool? didChange = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => EventEditPage(calendarApi: _calendarApi!)),
+    );
+    if (didChange == true) {
+      _fetchEventsForSelectedDate();
+    }
   }
 
   @override
@@ -258,6 +301,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 case 'Refresh':
                   if (!_isLoading) _fetchEventsForSelectedDate();
                   break;
+                case 'Settings':
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const SettingsPage()));
+                  break;
+                case 'Add Event':
+                  _openEventEditPage();
+                  break;
               }
             },
             itemBuilder: (context) => [
@@ -275,6 +325,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 value: 'Refresh',
                 child: Text('Refresh'),
               ),
+              const PopupMenuItem(
+                value: 'Settings',
+                child: Text('Settings'),
+              ),
+              const PopupMenuItem(
+                value: 'Add Event',
+                child: Text('Add Event'),
+              ),
             ],
             icon: const Icon(Icons.more_vert),
           ),
@@ -291,6 +349,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
           Expanded(child: _buildMainContent()),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _sendTestNotification,
+        child: const Icon(Icons.notifications),
       ),
     );
   }
