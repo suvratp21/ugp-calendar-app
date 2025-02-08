@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Add permission to schedule exact alarms -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Add permission to handle boot completed events -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <application
@@ -27,6 +31,25 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Awesome Notifications receivers -->
+        <receiver
+            android:name="me.carda.awesome_notifications.receivers.ActionReceiver"
+            android:exported="true" />
+        <receiver
+            android:name="me.carda.awesome_notifications.receivers.DismissedReceiver"
+            android:exported="true" />
+        <receiver
+            android:name="me.carda.awesome_notifications.receivers.IntentReceiver"
+            android:exported="true" />
+        <!-- Receiver to re-schedule notifications after reboot -->
+        <receiver
+            android:name="me.carda.awesome_notifications.receivers.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -9,6 +9,7 @@ import 'package:awesome_notifications/awesome_notifications.dart'; // new import
 import 'notification_settings.dart';
 import 'settings_page.dart';
 import 'event_edit_page.dart'; // new import
+import 'dart:async'; // new import
 
 void main() {
   // Initialize Awesome Notifications with a basic channel.
@@ -46,6 +47,12 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// Add a top-level notification action callback.
+Future<void> onNotificationActionReceived(ReceivedAction action) async {
+  // For now, simply log the action.
+  print("Notification action received: ${action.buttonKeyPressed}");
+}
+
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
 
@@ -55,7 +62,7 @@ class CalendarScreen extends StatefulWidget {
 
 class _CalendarScreenState extends State<CalendarScreen> {
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+    scopes: ['https://www.googleapis.com/auth/calendar'],
   );
 
   GoogleSignInAccount? _currentUser;
@@ -64,6 +71,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
   bool _isLoading = false;
   String? _errorMessage;
   DateTime _selectedDate = DateTime.now();
+  Timer? _timer; // new field for periodic refresh
+  // New field to track event IDs for which notifications have been scheduled.
+  final Set<String> _scheduledEventIds = {};
 
   @override
   void initState() {
@@ -81,6 +91,24 @@ class _CalendarScreenState extends State<CalendarScreen> {
         _handleSignIn();
       }
     });
+
+    // Start periodic refresh of events and notifications.
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (_calendarApi != null) {
+        _fetchEventsForSelectedDate();
+      }
+    });
+
+    // Set a top-level (static) listener instead of an inline lambda.
+    AwesomeNotifications().setListeners(
+      onActionReceivedMethod: onNotificationActionReceived,
+    );
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel(); // cancel timer to avoid memory leaks
+    super.dispose();
   }
 
   Future<void> _handleSignIn() async {
@@ -185,6 +213,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
           subject: event.summary ?? 'Untitled Event',
           color: Colors.blue,
           isAllDay: event.start?.date != null,
+          // Store the Google event ID for editing (if available)
+          notes: event.id,
         ),
       );
     }
@@ -218,16 +248,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
     ScaffoldMessenger.of(context).showSnackBar(snackBar);
   }
 
-  // Updated helper method to schedule notification with remaining time.
+  // Updated helper method to schedule notification with remaining time,
+  // but only schedule once per event.
   void _scheduleNotificationForEvent(Appointment appointment, int id) {
+    if (appointment.notes == null ||
+        _scheduledEventIds.contains(appointment.notes!)) {
+      return;
+    }
+    _scheduledEventIds.add(appointment.notes!);
+
     final offset =
         Duration(minutes: NotificationSettings.defaultNotificationOffset);
     var scheduledTime = appointment.startTime.subtract(offset);
-    // Ensure scheduledTime is in the future.
     if (scheduledTime.isBefore(DateTime.now())) {
       scheduledTime = DateTime.now().add(const Duration(seconds: 1));
     }
-    // Compute remaining time until event start.
     final durationRemaining = appointment.startTime.difference(DateTime.now());
     final minutesRemaining = durationRemaining.inMinutes;
     final secondsRemaining = durationRemaining.inSeconds % 60;
@@ -236,25 +271,42 @@ class _CalendarScreenState extends State<CalendarScreen> {
         : '$secondsRemaining seconds';
 
     AwesomeNotifications().createNotification(
-        content: NotificationContent(
-          id: id,
-          channelKey: 'basic_channel',
-          title: appointment.subject,
-          body:
-              'Your event "${appointment.subject}" is starting in $remainingText!',
-          notificationLayout: NotificationLayout.Default,
+      content: NotificationContent(
+        id: id,
+        channelKey: 'basic_channel',
+        title: appointment.subject,
+        body:
+            'Your event "${appointment.subject}" is starting in $remainingText!',
+        notificationLayout: NotificationLayout.Default,
+        // Replace additionalData with payload (a Map<String, String>).
+        payload: {'eventId': appointment.notes!},
+      ),
+      actionButtons: [
+        NotificationActionButton(
+          key: 'ACCEPT',
+          label: 'Accept',
         ),
-        schedule: NotificationCalendar(
-          year: scheduledTime.year,
-          month: scheduledTime.month,
-          day: scheduledTime.day,
-          hour: scheduledTime.hour,
-          minute: scheduledTime.minute,
-          second: scheduledTime.second,
-          millisecond: 0,
-          repeats: false,
-          allowWhileIdle: true, // allows notification while app is closed
-        ));
+        NotificationActionButton(
+          key: 'POSTPONE',
+          label: 'Postpone',
+        ),
+        NotificationActionButton(
+          key: 'REJECT',
+          label: 'Reject',
+        ),
+      ],
+      schedule: NotificationCalendar(
+        year: scheduledTime.year,
+        month: scheduledTime.month,
+        day: scheduledTime.day,
+        hour: scheduledTime.hour,
+        minute: scheduledTime.minute,
+        second: scheduledTime.second,
+        millisecond: 0,
+        repeats: false,
+        allowWhileIdle: true,
+      ),
+    );
   }
 
   // New test notification method.
@@ -273,7 +325,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     if (_calendarApi == null) return;
     bool? didChange = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => EventEditPage(calendarApi: _calendarApi!)),
+      MaterialPageRoute(
+          builder: (_) => EventEditPage(calendarApi: _calendarApi!)),
     );
     if (didChange == true) {
       _fetchEventsForSelectedDate();
@@ -350,9 +403,22 @@ class _CalendarScreenState extends State<CalendarScreen> {
           Expanded(child: _buildMainContent()),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _sendTestNotification,
-        child: const Icon(Icons.notifications),
+      // Replace single FAB with a column of two buttons:
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            heroTag: "add",
+            onPressed: _openEventEditPage, // Add event
+            child: const Icon(Icons.add),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton(
+            heroTag: "notify",
+            onPressed: _sendTestNotification,
+            child: const Icon(Icons.notifications),
+          ),
+        ],
       ),
     );
   }
@@ -372,31 +438,82 @@ class _CalendarScreenState extends State<CalendarScreen> {
     if (_errorMessage != null) {
       return Center(child: Text(_errorMessage!));
     }
-    return SfCalendar(
-      view: CalendarView.day,
-      dataSource: _CalendarDataSource(_events),
-      key: ValueKey(_selectedDate),
-      initialDisplayDate: _selectedDate,
-      headerStyle: const CalendarHeaderStyle(
-        textAlign: TextAlign.center,
-      ),
-      onViewChanged: (ViewChangedDetails details) {
-        if (_selectedDate != details.visibleDates.first) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            setState(() {
-              _selectedDate = details.visibleDates.first;
-              _isLoading = true;
-            });
-            if (_calendarApi != null) {
-              _fetchEventsForSelectedDate();
-            } else {
-              setState(() {
-                _isLoading = false;
-              });
+    // Wrap SfCalendar with ConstrainedBox to enforce nonnegative height constraints.
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 0.0),
+      child: SfCalendar(
+        view: CalendarView.day,
+        dataSource: _CalendarDataSource(_events),
+        key: ValueKey(_selectedDate),
+        initialDisplayDate: _selectedDate,
+        headerStyle: const CalendarHeaderStyle(
+          textAlign: TextAlign.center,
+        ),
+        // Updated onTap callback
+        onTap: (CalendarTapDetails details) {
+          if (details.appointments != null &&
+              details.appointments!.isNotEmpty) {
+            final Appointment tapped = details.appointments!.first;
+            if (tapped.notes != null && tapped.notes!.isNotEmpty) {
+              // Build an Event object from the tapped appointment.
+              final Event event = Event();
+              event.id = tapped.notes;
+              event.summary = tapped.subject;
+              event.start =
+                  EventDateTime(dateTime: tapped.startTime, timeZone: "UTC");
+              event.end =
+                  EventDateTime(dateTime: tapped.endTime, timeZone: "UTC");
+
+              showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  content: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                          'Starts at ${DateFormat('hh:mm a').format(tapped.startTime)}'),
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EventEditPage(
+                                  calendarApi: _calendarApi!, event: event),
+                            ),
+                          ).then((didChange) {
+                            if (didChange == true) {
+                              _fetchEventsForSelectedDate();
+                            }
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
             }
-          });
-        }
-      },
+          }
+        },
+        onViewChanged: (ViewChangedDetails details) {
+          if (_selectedDate != details.visibleDates.first) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              setState(() {
+                _selectedDate = details.visibleDates.first;
+                _isLoading = true;
+              });
+              if (_calendarApi != null) {
+                _fetchEventsForSelectedDate();
+              } else {
+                setState(() {
+                  _isLoading = false;
+                });
+              }
+            });
+          }
+        },
+      ),
     );
   }
 }
