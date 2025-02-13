@@ -8,29 +8,42 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  late TextEditingController _controller;
+  int _offsetMinutes = NotificationSettings.defaultNotificationOffset;
+  int _postponeMinutes = NotificationSettings.defaultPostponeTime;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(
-        text: NotificationSettings.defaultNotificationOffset.toString());
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _saveSetting() {
-    final value = int.tryParse(_controller.text);
-    if (value != null) {
+  Future<void> _selectTime(String label, int currentMinutes,
+      void Function(int newMinutes) onTimeSelected) async {
+    // Calculate initial hour in 0–11 range.
+    final currentHour = currentMinutes ~/ 60;
+    final initialHour = currentHour < 12 ? currentHour : currentHour - 12;
+    final initialMinute = currentMinutes % 60;
+    final initialTime = TimeOfDay(hour: initialHour, minute: initialMinute);
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      helpText: "Select $label time ",
+      builder: (BuildContext context, Widget? child) {
+        // Force 24-hour mode so AM/PM option is removed.
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      // Normalize picked hour: if hour >=12 then subtract 12 so that 12 becomes 0.
+      final normalizedHour = picked.hour < 12 ? picked.hour : picked.hour - 12;
+      final newMinutes = normalizedHour * 60 + picked.minute;
       setState(() {
-        NotificationSettings.defaultNotificationOffset = value;
+        onTimeSelected(newMinutes);
+        NotificationSettings.defaultNotificationOffset =
+            label == "notification offset"
+                ? newMinutes
+                : NotificationSettings.defaultNotificationOffset;
+        NotificationSettings.defaultPostponeTime = label == "postpone"
+            ? newMinutes
+            : NotificationSettings.defaultPostponeTime;
       });
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text("Default time updated")));
     }
   }
 
@@ -42,19 +55,30 @@ class _SettingsPageState extends State<SettingsPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            const Text("Notification offset in minutes before event"),
-            TextField(
-              controller: _controller,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                hintText: "Enter minutes",
-              ),
+            // Notification offset picker.
+            ListTile(
+              title: const Text("Notification offset"),
+              subtitle: Text("Current: $_offsetMinutes minute(s)"),
+              trailing: const Icon(Icons.access_time),
+              onTap: () async {
+                await _selectTime("notification offset", _offsetMinutes,
+                    (newMinutes) {
+                  _offsetMinutes = newMinutes;
+                });
+              },
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _saveSetting,
-              child: const Text("Save"),
-            )
+            // Postpone time picker.
+            ListTile(
+              title: const Text("Default postpone time"),
+              subtitle: Text("Current: $_postponeMinutes minute(s)"),
+              trailing: const Icon(Icons.access_time),
+              onTap: () async {
+                await _selectTime("postpone", _postponeMinutes, (newMinutes) {
+                  _postponeMinutes = newMinutes;
+                });
+              },
+            ),
           ],
         ),
       ),
