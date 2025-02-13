@@ -333,6 +333,32 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
+  // NEW: Updated _pickDate method using CalendarDatePicker for immediate selection.
+  Future<void> _pickDate() async {
+    final DateTime? picked = await showDialog<DateTime>(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: CalendarDatePicker(
+            initialDate: _selectedDate,
+            firstDate: DateTime(2000),
+            lastDate: DateTime(2100),
+            onDateChanged: (date) {
+              Navigator.of(context).pop(date);
+            },
+          ),
+        );
+      },
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+        _isLoading = true;
+      });
+      _fetchEventsForSelectedDate();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final String formattedDate =
@@ -393,32 +419,34 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
       body: Column(
         children: [
+          // Modified header: add calendar icon button in front of date.
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Text(
-              formattedDate,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.calendar_today),
+                  onPressed: _pickDate,
+                ),
+                GestureDetector(
+                  onTap: _pickDate,
+                  child: Text(
+                    formattedDate,
+                    style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(child: _buildMainContent()),
         ],
       ),
-      // Replace single FAB with a column of two buttons:
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FloatingActionButton(
-            heroTag: "add",
-            onPressed: _openEventEditPage, // Add event
-            child: const Icon(Icons.add),
-          ),
-          const SizedBox(height: 12),
-          FloatingActionButton(
-            heroTag: "notify",
-            onPressed: _sendTestNotification,
-            child: const Icon(Icons.notifications),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton(
+        heroTag: "add",
+        onPressed: _openEventEditPage, // Add event
+        child: const Icon(Icons.add),
       ),
     );
   }
@@ -464,33 +492,44 @@ class _CalendarScreenState extends State<CalendarScreen> {
               event.end =
                   EventDateTime(dateTime: tapped.endTime, timeZone: "UTC");
 
+              // Show dialog with all event details except event ID.
               showDialog(
                 context: context,
                 builder: (_) => AlertDialog(
-                  content: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  title: Text(tapped.subject),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                          'Starts at ${DateFormat('hh:mm a').format(tapped.startTime)}'),
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => EventEditPage(
-                                  calendarApi: _calendarApi!, event: event),
-                            ),
-                          ).then((didChange) {
-                            if (didChange == true) {
-                              _fetchEventsForSelectedDate();
-                            }
-                          });
-                        },
-                      ),
+                          'Start: ${DateFormat('MMM dd, yyyy hh:mm a').format(tapped.startTime)}'),
+                      Text(
+                          'End: ${DateFormat('MMM dd, yyyy hh:mm a').format(tapped.endTime)}'),
                     ],
                   ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text("Close"),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => EventEditPage(
+                                calendarApi: _calendarApi!, event: event),
+                          ),
+                        ).then((didChange) {
+                          if (didChange == true) {
+                            _fetchEventsForSelectedDate();
+                          }
+                        });
+                      },
+                      child: const Text("Edit"),
+                    )
+                  ],
                 ),
               );
             }
