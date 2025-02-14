@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:googleapis/calendar/v3.dart' hide Colors;
 import 'package:intl/intl.dart';
 import 'clock_duration_picker.dart';
+import 'circular_duration_picker_full.dart'; // NEW: import duration picker
 
 class EventEditPage extends StatefulWidget {
   final CalendarApi calendarApi;
@@ -51,7 +52,7 @@ class _EventEditPageState extends State<EventEditPage> {
   }
 
   Future<void> _pickStartTime() async {
-    final pickedTime = await showTimePicker(
+    final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
       initialTime: _startTime,
     );
@@ -67,15 +68,12 @@ class _EventEditPageState extends State<EventEditPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Select Duration (minutes)"),
-          content: Center(
-            child: ClockDurationPicker(
-              durations: [15, 30, 45, 60, 75, 90],
-              selectedDuration: _durationMinutes,
-              onDurationSelected: (value) {
-                Navigator.of(context).pop(value);
-              },
-            ),
+          title: const Text("Select Duration"),
+          content: CircularDurationPickerFull(
+            initialDurationMinutes: _durationMinutes,
+            onDurationSelected: (duration) {
+              Navigator.of(context).pop(duration);
+            },
           ),
         );
       },
@@ -145,13 +143,13 @@ class _EventEditPageState extends State<EventEditPage> {
             ListTile(
               title: const Text("Start Time"),
               subtitle: Text(_startTime.format(context)),
-              onTap: _pickStartTime,
+              onTap: _pickStartTime, // NEW: use simple clock picker
             ),
             ListTile(
               title: const Text("Duration"),
               subtitle: Text("$_durationMinutes minute(s)"),
               trailing: const Icon(Icons.access_time),
-              onTap: _pickDuration,
+              onTap: _pickDuration, // NEW: use circular duration picker
             ),
             const SizedBox(height: 32),
             ElevatedButton(

@@ -74,6 +74,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Timer? _timer; // new field for periodic refresh
   // New field to track event IDs for which notifications have been scheduled.
   final Set<String> _scheduledEventIds = {};
+  final CalendarController _calendarController = CalendarController(); // NEW
 
   @override
   void initState() {
@@ -103,6 +104,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
     AwesomeNotifications().setListeners(
       onActionReceivedMethod: onNotificationActionReceived,
     );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _calendarController.displayDate =
+          DateTime.now(); // NEW: scroll to current time
+    });
   }
 
   @override
@@ -475,11 +481,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 0.0),
       child: SfCalendar(
+        controller: _calendarController, // NEW: pass controller
         view: CalendarView.day,
         dataSource: _CalendarDataSource(_events),
         key: ValueKey(_selectedDate),
         initialDisplayDate: _selectedDate,
         headerHeight: 0, // Hide header to remove date and time display.
+        viewHeaderHeight: 0, // Hide date and day header.
         onTap: (CalendarTapDetails details) {
           if (details.appointments != null &&
               details.appointments!.isNotEmpty) {
