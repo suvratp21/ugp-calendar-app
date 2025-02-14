@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'notification_settings.dart';
+import 'circular_time_picker.dart';
+import 'circular_time_picker_full.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -8,41 +10,37 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  int _offsetMinutes = NotificationSettings.defaultNotificationOffset;
-  int _postponeMinutes = NotificationSettings.defaultPostponeTime;
+  // NEW: Replace minute-only settings with full time settings.
+  int _offsetHour = 0;
+  int _offsetMinute = 5;
+  int _postponeHour = 0;
+  int _postponeMinute = 10;
+  int _notificationHour = 9;
+  int _notificationMinute = 0;
 
-  Future<void> _selectTime(String label, int currentMinutes,
-      void Function(int newMinutes) onTimeSelected) async {
-    // Calculate initial hour in 0–11 range.
-    final currentHour = currentMinutes ~/ 60;
-    final initialHour = currentHour < 12 ? currentHour : currentHour - 12;
-    final initialMinute = currentMinutes % 60;
-    final initialTime = TimeOfDay(hour: initialHour, minute: initialMinute);
-    final TimeOfDay? picked = await showTimePicker(
+  // NEW: Generic method to select full time (hours and minutes).
+  Future<void> _selectFullTime(String label, int initialHour, int initialMinute,
+      void Function(int newHour, int newMinute) onTimeSelected) async {
+    final result = await showDialog<Map<String, int>>(
       context: context,
-      initialTime: initialTime,
-      helpText: "Select $label time ",
-      builder: (BuildContext context, Widget? child) {
-        // Force 24-hour mode so AM/PM option is removed.
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
-          child: child!,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Select $label Time"),
+          content: Center(
+            child: CircularTimePickerFull(
+              initialHour: initialHour,
+              initialMinute: initialMinute,
+              onTimeSelected: (hour, minute) {
+                Navigator.of(context).pop({'hour': hour, 'minute': minute});
+              },
+            ),
+          ),
         );
       },
     );
-    if (picked != null) {
-      // Normalize picked hour: if hour >=12 then subtract 12 so that 12 becomes 0.
-      final normalizedHour = picked.hour < 12 ? picked.hour : picked.hour - 12;
-      final newMinutes = normalizedHour * 60 + picked.minute;
+    if (result != null) {
       setState(() {
-        onTimeSelected(newMinutes);
-        NotificationSettings.defaultNotificationOffset =
-            label == "notification offset"
-                ? newMinutes
-                : NotificationSettings.defaultNotificationOffset;
-        NotificationSettings.defaultPostponeTime = label == "postpone"
-            ? newMinutes
-            : NotificationSettings.defaultPostponeTime;
+        onTimeSelected(result['hour']!, result['minute']!);
       });
     }
   }
@@ -55,30 +53,38 @@ class _SettingsPageState extends State<SettingsPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Notification offset picker.
+            // Notification offset picker using full time picker.
             ListTile(
               title: const Text("Notification offset"),
-              subtitle: Text("Current: $_offsetMinutes minute(s)"),
+              subtitle: Text(
+                  "Current: ${_offsetHour.toString().padLeft(2, '0')}:${_offsetMinute.toString().padLeft(2, '0')}"),
               trailing: const Icon(Icons.access_time),
               onTap: () async {
-                await _selectTime("notification offset", _offsetMinutes,
-                    (newMinutes) {
-                  _offsetMinutes = newMinutes;
+                await _selectFullTime(
+                    "notification offset", _offsetHour, _offsetMinute,
+                    (newHour, newMinute) {
+                  _offsetHour = newHour;
+                  _offsetMinute = newMinute;
                 });
               },
             ),
             const SizedBox(height: 20),
-            // Postpone time picker.
+            // Default postpone time using full time picker.
             ListTile(
               title: const Text("Default postpone time"),
-              subtitle: Text("Current: $_postponeMinutes minute(s)"),
+              subtitle: Text(
+                  "Current: ${_postponeHour.toString().padLeft(2, '0')}:${_postponeMinute.toString().padLeft(2, '0')}"),
               trailing: const Icon(Icons.access_time),
               onTap: () async {
-                await _selectTime("postpone", _postponeMinutes, (newMinutes) {
-                  _postponeMinutes = newMinutes;
+                await _selectFullTime(
+                    "postpone", _postponeHour, _postponeMinute,
+                    (newHour, newMinute) {
+                  _postponeHour = newHour;
+                  _postponeMinute = newMinute;
                 });
               },
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),

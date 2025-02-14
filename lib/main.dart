@@ -359,6 +359,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
+  // NEW: Helper method to get full event details.
+  Future<Event> _getEventDetails(String eventId) async {
+    return await _calendarApi!.events.get('primary', eventId);
+  }
+
   @override
   Widget build(BuildContext context) {
     final String formattedDate =
@@ -474,62 +479,78 @@ class _CalendarScreenState extends State<CalendarScreen> {
         dataSource: _CalendarDataSource(_events),
         key: ValueKey(_selectedDate),
         initialDisplayDate: _selectedDate,
-        headerStyle: const CalendarHeaderStyle(
-          textAlign: TextAlign.center,
-        ),
-        // Updated onTap callback
+        headerHeight: 0, // Hide header to remove date and time display.
         onTap: (CalendarTapDetails details) {
           if (details.appointments != null &&
               details.appointments!.isNotEmpty) {
             final Appointment tapped = details.appointments!.first;
             if (tapped.notes != null && tapped.notes!.isNotEmpty) {
-              // Build an Event object from the tapped appointment.
-              final Event event = Event();
-              event.id = tapped.notes;
-              event.summary = tapped.subject;
-              event.start =
-                  EventDateTime(dateTime: tapped.startTime, timeZone: "UTC");
-              event.end =
-                  EventDateTime(dateTime: tapped.endTime, timeZone: "UTC");
-
-              // Show dialog with all event details except event ID.
+              // Instead of building a basic Event, fetch full details.
               showDialog(
                 context: context,
-                builder: (_) => AlertDialog(
-                  title: Text(tapped.subject),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                          'Start: ${DateFormat('MMM dd, yyyy hh:mm a').format(tapped.startTime)}'),
-                      Text(
-                          'End: ${DateFormat('MMM dd, yyyy hh:mm a').format(tapped.endTime)}'),
-                    ],
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text("Close"),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => EventEditPage(
-                                calendarApi: _calendarApi!, event: event),
+                builder: (_) => FutureBuilder<Event>(
+                  future: _getEventDetails(tapped.notes!),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const AlertDialog(
+                        content: SizedBox(
+                          height: 100,
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                      );
+                    }
+                    final Event fullEvent = snapshot.data!;
+                    // Collect extra details.
+                    final location = fullEvent.location ?? "No location";
+                    final description =
+                        fullEvent.description ?? "No description";
+                    final attendees = fullEvent.attendees
+                            ?.map((att) => att.email)
+                            .join(", ") ??
+                        "No attendees";
+                    return AlertDialog(
+                      title: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(fullEvent.summary ?? "Untitled"),
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => EventEditPage(
+                                      calendarApi: _calendarApi!,
+                                      event: fullEvent),
+                                ),
+                              ).then((didChange) {
+                                if (didChange == true) {
+                                  _fetchEventsForSelectedDate();
+                                }
+                              });
+                            },
                           ),
-                        ).then((didChange) {
-                          if (didChange == true) {
-                            _fetchEventsForSelectedDate();
-                          }
-                        });
-                      },
-                      child: const Text("Edit"),
-                    )
-                  ],
+                        ],
+                      ),
+                      content: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                                'Start: ${DateFormat("MMM dd, yyyy hh:mm a").format(tapped.startTime)}'),
+                            Text(
+                                'End: ${DateFormat("MMM dd, yyyy hh:mm a").format(tapped.endTime)}'),
+                            const SizedBox(height: 8),
+                            Text('Location: $location'),
+                            Text('Description: $description'),
+                            Text('Attendees: $attendees'),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               );
             }

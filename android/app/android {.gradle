@@ -1,0 +1,8 @@
+android {
+    compileSdkVersion 33
+    // NEW: Ensure Java 1.8 compatibility.
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
