@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-import 'dart:math';
 import 'circular_time_picker.dart'; // Reuse circular picker widget
 
 class CircularDurationPickerFull extends StatefulWidget {
   final int initialDurationMinutes; // total minutes
   final void Function(int durationMinutes) onDurationSelected;
   const CircularDurationPickerFull({
-    Key? key,
+    super.key,
     required this.initialDurationMinutes,
     required this.onDurationSelected,
-  }) : super(key: key);
+  });
 
   @override
   State<CircularDurationPickerFull> createState() =>

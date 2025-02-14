@@ -7,11 +7,11 @@ class CircularTimePicker extends StatelessWidget {
   final void Function(int) onSelected;
 
   const CircularTimePicker({
-    Key? key,
+    super.key,
     required this.minuteOptions,
     required this.selectedMinutes,
     required this.onSelected,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -315,17 +315,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  // New test notification method.
-  void _sendTestNotification() {
-    AwesomeNotifications().createNotification(
-        content: NotificationContent(
-      id: 999,
-      channelKey: 'basic_channel',
-      title: 'Test Notification',
-      body: 'This is a test notification sent by the button.',
-      notificationLayout: NotificationLayout.Default,
-    ));
-  }
 
   Future<void> _openEventEditPage() async {
     if (_calendarApi == null) return;

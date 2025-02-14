@@ -7,11 +7,11 @@ class ClockDurationPicker extends StatelessWidget {
   final void Function(int) onDurationSelected;
 
   const ClockDurationPicker({
-    Key? key,
+    super.key,
     required this.durations,
     required this.selectedDuration,
     required this.onDurationSelected,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'notification_settings.dart';
-import 'circular_time_picker.dart';
 import 'circular_time_picker_full.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -15,8 +13,6 @@ class _SettingsPageState extends State<SettingsPage> {
   int _offsetMinute = 5;
   int _postponeHour = 0;
   int _postponeMinute = 10;
-  int _notificationHour = 9;
-  int _notificationMinute = 0;
 
   // NEW: Generic method to select full time (hours and minutes).
   Future<void> _selectFullTime(String label, int initialHour, int initialMinute,
@@ -25,7 +21,7 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text("Select $label Time"),
+          title: Text("$label Time"),
           content: Center(
             child: CircularTimePickerFull(
               initialHour: initialHour,
