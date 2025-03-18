@@ -75,6 +75,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   // New field to track event IDs for which notifications have been scheduled.
   final Set<String> _scheduledEventIds = {};
   final CalendarController _calendarController = CalendarController(); // NEW
+  List<Appointment> _cachedAppointments =
+      []; // NEW: cache for fetched appointments
 
   @override
   void initState() {
@@ -163,41 +165,71 @@ class _CalendarScreenState extends State<CalendarScreen> {
       return;
     }
 
+    // Check if selected date is within the cached range.
+    if (_cachedAppointments.isNotEmpty) {
+      final earliest = _cachedAppointments
+          .reduce((a, b) => a.startTime.isBefore(b.startTime) ? a : b)
+          .startTime;
+      final latest = _cachedAppointments
+          .reduce((a, b) => a.startTime.isAfter(b.startTime) ? a : b)
+          .startTime;
+      if (!_selectedDate.isBefore(
+              DateTime(earliest.year, earliest.month, earliest.day)) &&
+          !_selectedDate
+              .isAfter(DateTime(latest.year, latest.month, latest.day))) {
+        final cachedFiltered = _cachedAppointments.where((appointment) {
+          final d = appointment.startTime;
+          return d.year == _selectedDate.year &&
+              d.month == _selectedDate.month &&
+              d.day == _selectedDate.day;
+        }).toList();
+        setState(() {
+          _events = cachedFiltered;
+          _isLoading = false;
+        });
+        return;
+      }
+    }
+
     try {
-      final DateTime startOfDay =
-          DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
-      final DateTime endOfDay = startOfDay
-          .add(const Duration(days: 1))
-          .subtract(const Duration(seconds: 1));
+      final DateTime rangeStart =
+          DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day)
+              .subtract(const Duration(days: 5));
+      final DateTime rangeEnd = DateTime(
+              _selectedDate.year, _selectedDate.month, _selectedDate.day)
+          .add(const Duration(days: 5, hours: 23, minutes: 59, seconds: 59));
 
       final Events events = await _calendarApi!.events.list(
         'primary',
-        timeMin: startOfDay.toUtc(),
-        timeMax: endOfDay.toUtc(),
+        timeMin: rangeStart.toUtc(),
+        timeMax: rangeEnd.toUtc(),
         singleEvents: true,
         orderBy: 'startTime',
       );
 
-      final appointments = _convertGoogleEvents(events.items ?? []);
+      _cachedAppointments = _convertGoogleEvents(events.items ?? []);
+      final filteredAppointments = _cachedAppointments.where((appointment) {
+        final d = appointment.startTime;
+        return d.year == _selectedDate.year &&
+            d.month == _selectedDate.month &&
+            d.day == _selectedDate.day;
+      }).toList();
       setState(() {
-        _events = appointments;
+        _events = filteredAppointments;
         _isLoading = false;
       });
 
-      // Schedule notifications for upcoming events.
+      // Schedule notifications for events in the filtered list.
       final now = DateTime.now();
-      for (int i = 0; i < appointments.length; i++) {
-        final appointment = appointments[i];
+      for (int i = 0; i < filteredAppointments.length; i++) {
+        final appointment = filteredAppointments[i];
         if (appointment.startTime.isAfter(now)) {
           _scheduleNotificationForEvent(appointment, i);
         }
       }
 
-      print('Fetched ${events.items?.length ?? 0} events for $_selectedDate');
-      for (var event in events.items ?? []) {
-        print(
-            'Event: ${event.summary}, Start: ${event.start?.dateTime ?? event.start?.date}, End: ${event.end?.dateTime ?? event.end?.date}');
-      }
+      print(
+          'Fetched ${events.items?.length ?? 0} events covering 5 days before and after $_selectedDate');
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to load events: ${e.toString()}';
@@ -314,7 +346,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
     );
   }
-
 
   Future<void> _openEventEditPage() async {
     if (_calendarApi == null) return;

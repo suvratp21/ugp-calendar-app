@@ -21,7 +21,7 @@ class NotificationActionHandler {
     }
   }
 
-  Future<void> _postponeEvent(Map<String, String>? payload) async {
+  Future<void> _postponeEvent(Map<String, String?>? payload) async {
     final eventId = payload?['eventId'];
     if (eventId == null || eventId.isEmpty) {
       print("No eventId provided in payload for postponing.");
@@ -46,7 +46,7 @@ class NotificationActionHandler {
     }
   }
 
-  Future<void> _rejectEvent(Map<String, String>? payload) async {
+  Future<void> _rejectEvent(Map<String, String?>? payload) async {
     final eventId = payload?['eventId'];
     if (eventId == null || eventId.isEmpty) {
       print("No eventId provided in payload for rejection.");
