@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- NEW: Add permission to read contacts -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
     <application
         android:label="calendar_app"
         android:name="${applicationName}"

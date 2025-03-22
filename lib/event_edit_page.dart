@@ -3,7 +3,11 @@ import 'package:googleapis/calendar/v3.dart' hide Colors;
 import 'package:intl/intl.dart';
 import 'circular_duration_picker_full.dart'; // NEW: import duration picker
 import 'local_members_store.dart'; // NEW: import local members store
-import 'package:fluttercontactpicker/fluttercontactpicker.dart'; // UPDATED: use correct package name
+import 'package:fluttercontactpicker/fluttercontactpicker.dart'
+    hide Contact; // UPDATED: use correct package name
+import 'package:contacts_service/contacts_service.dart'; // NEW: import contacts_service
+import 'package:permission_handler/permission_handler.dart'; // NEW: import permission handler
+import 'contacts_list_screen.dart'; // NEW: import ContactsListScreen
 
 class EventEditPage extends StatefulWidget {
   final CalendarApi calendarApi;
@@ -219,6 +223,52 @@ class _EventEditPageState extends State<EventEditPage> {
     }
   }
 
+  // NEW: show a dropdown (bottom sheet) of contacts with emails.
+  Future<void> _showContactsDropdown() async {
+    // Request contacts permission before accessing contacts.
+    final permissionStatus = await Permission.contacts.request();
+    if (!permissionStatus.isGranted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Contacts permission denied")));
+      return;
+    }
+    try {
+      // Fetch contacts without thumbnails for better performance.
+      Iterable<Contact> contacts =
+          await ContactsService.getContacts(withThumbnails: false);
+      List<Contact> contactsWithEmail = contacts
+          .where((c) => c.emails != null && c.emails!.isNotEmpty)
+          .toList();
+
+      if (contactsWithEmail.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("No contacts with email found")));
+        return;
+      }
+
+      // Navigate to a new screen to display contacts.
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ContactsListScreen(
+            contacts: contactsWithEmail,
+            onContactSelected: (email) {
+              String current = _membersController.text;
+              if (current.isNotEmpty) current += ", ";
+              setState(() {
+                _membersController.text = current + email;
+              });
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      // Handle errors during contact fetching.
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error fetching contacts: ${e.toString()}")));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.event != null;
@@ -317,7 +367,8 @@ class _EventEditPageState extends State<EventEditPage> {
                           .copyWith(
                         suffixIcon: IconButton(
                           icon: const Icon(Icons.contacts),
-                          onPressed: _pickContact,
+                          onPressed:
+                              _showContactsDropdown, // UPDATED: use dropdown helper
                         ),
                       ),
                     ),

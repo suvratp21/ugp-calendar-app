@@ -327,15 +327,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
       actionButtons: [
         NotificationActionButton(
           key: 'ACCEPT',
-          label: 'Accept',
+          label: '✅',
         ),
         NotificationActionButton(
           key: 'POSTPONE',
-          label: 'Postpone',
+          label: '🏃',
         ),
         NotificationActionButton(
           key: 'REJECT',
-          label: 'Reject',
+          label: '❌',
         ),
       ],
       schedule: NotificationCalendar(
