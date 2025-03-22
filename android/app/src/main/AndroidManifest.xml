@@ -41,10 +41,10 @@
         <receiver
             android:name="me.carda.awesome_notifications.receivers.IntentReceiver"
             android:exported="true" />
-        <!-- Receiver to re-schedule notifications after reboot -->
+        <!-- Updated BootReceiver -->
         <receiver
-            android:name="me.carda.awesome_notifications.receivers.BootReceiver"
-            android:exported="true">
+            android:name="me.carda.awesome_notifications.receivers.AwesomeNotificationsBootReceiver"
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />

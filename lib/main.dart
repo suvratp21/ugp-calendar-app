@@ -11,8 +11,12 @@ import 'settings_page.dart';
 import 'event_edit_page.dart'; // new import
 import 'dart:async'; // new import
 import 'local_members_store.dart'; // NEW: import local members store
+import 'package:permission_handler/permission_handler.dart'; // NEW: import permission handler
 
-void main() {
+Future<void> main() async {
+  // NEW: make main async
+  WidgetsFlutterBinding.ensureInitialized(); // NEW: initialize widget binding
+  await Permission.contacts.request(); // NEW: request contact permission
   // Initialize Awesome Notifications with a basic channel.
   AwesomeNotifications().initialize(null, [
     NotificationChannel(

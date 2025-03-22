@@ -3,6 +3,7 @@ import 'package:googleapis/calendar/v3.dart' hide Colors;
 import 'package:intl/intl.dart';
 import 'circular_duration_picker_full.dart'; // NEW: import duration picker
 import 'local_members_store.dart'; // NEW: import local members store
+import 'package:fluttercontactpicker/fluttercontactpicker.dart'; // UPDATED: use correct package name
 
 class EventEditPage extends StatefulWidget {
   final CalendarApi calendarApi;
@@ -200,6 +201,24 @@ class _EventEditPageState extends State<EventEditPage> {
     }
   }
 
+  // UPDATED: contact picker method using flutter_contact_picker.
+  Future<void> _pickContact() async {
+    try {
+      final FullContact contact = await FlutterContactPicker.pickFullContact();
+      final String? email =
+          contact.emails.isNotEmpty ? contact.emails.first.email : null;
+      if (email != null && email.isNotEmpty) {
+        String current = _membersController.text;
+        if (current.isNotEmpty) current += ", ";
+        setState(() {
+          _membersController.text = current + email;
+        });
+      }
+    } catch (e) {
+      // ...error handling if needed...
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.event != null;
@@ -293,8 +312,14 @@ class _EventEditPageState extends State<EventEditPage> {
                     TextField(
                       controller: _membersController,
                       decoration: const InputDecoration(
-                          labelText: "Members (comma separated)",
-                          border: OutlineInputBorder()),
+                              labelText: "Members (comma separated)",
+                              border: OutlineInputBorder())
+                          .copyWith(
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.contacts),
+                          onPressed: _pickContact,
+                        ),
+                      ),
                     ),
                   ],
                 ),
