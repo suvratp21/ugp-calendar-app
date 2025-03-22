@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:googleapis/calendar/v3.dart' hide Colors;
 import 'package:intl/intl.dart';
 import 'circular_duration_picker_full.dart'; // NEW: import duration picker
+import 'local_members_store.dart'; // NEW: import local members store
 
 class EventEditPage extends StatefulWidget {
   final CalendarApi calendarApi;
@@ -18,6 +19,7 @@ class _EventEditPageState extends State<EventEditPage> {
   final _descriptionController = TextEditingController(); // NEW: description
   final _attendeesController =
       TextEditingController(); // NEW: attendees (comma separated)
+  final _membersController = TextEditingController(); // NEW: members
 
   DateTime _startDate = DateTime.now();
   TimeOfDay _startTime = TimeOfDay.now();
@@ -42,6 +44,13 @@ class _EventEditPageState extends State<EventEditPage> {
             .map((att) => att.email ?? '')
             .where((email) => email.isNotEmpty)
             .join(", ");
+      }
+      // NEW: populate members if stored locally.
+      if (widget.event!.id != null) {
+        final members = LocalMembersStore.getMembers(widget.event!.id!);
+        if (members != null) {
+          _membersController.text = members.join(", ");
+        }
       }
     } else {
       _startDate = DateTime.now();
@@ -126,13 +135,21 @@ class _EventEditPageState extends State<EventEditPage> {
 
     try {
       if (widget.event == null) {
-        // Insert new event.
-        await widget.calendarApi.events.insert(event, "primary");
+        final insertedEvent =
+            await widget.calendarApi.events.insert(event, "primary");
+        event.id = insertedEvent.id;
       } else {
-        // Update existing event.
         event.id = widget.event!.id;
         await widget.calendarApi.events.update(event, "primary", event.id!);
       }
+      // NEW: Store members locally.
+      LocalMembersStore.setMembers(
+          event.id!,
+          _membersController.text
+              .split(',')
+              .map((m) => m.trim())
+              .where((m) => m.isNotEmpty)
+              .toList());
       Navigator.pop(context, true);
     } catch (e) {
       ScaffoldMessenger.of(context)
@@ -269,6 +286,14 @@ class _EventEditPageState extends State<EventEditPage> {
                       controller: _attendeesController,
                       decoration: const InputDecoration(
                           labelText: "Attendees (comma separated emails)",
+                          border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 16),
+                    // NEW: Members field.
+                    TextField(
+                      controller: _membersController,
+                      decoration: const InputDecoration(
+                          labelText: "Members (comma separated)",
                           border: OutlineInputBorder()),
                     ),
                   ],

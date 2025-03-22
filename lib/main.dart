@@ -10,6 +10,7 @@ import 'notification_settings.dart';
 import 'settings_page.dart';
 import 'event_edit_page.dart'; // new import
 import 'dart:async'; // new import
+import 'local_members_store.dart'; // NEW: import local members store
 
 void main() {
   // Initialize Awesome Notifications with a basic channel.
@@ -574,6 +575,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             Text('Location: $location'),
                             Text('Description: $description'),
                             Text('Attendees: $attendees'),
+                            // NEW: Display local members if available.
+                            Builder(
+                              builder: (context) {
+                                final members = LocalMembersStore.getMembers(
+                                        fullEvent.id ?? "") ??
+                                    [];
+                                return Text(
+                                    'Members: ${members.isEmpty ? "No members" : members.join(", ")}');
+                              },
+                            ),
                           ],
                         ),
                       ),
